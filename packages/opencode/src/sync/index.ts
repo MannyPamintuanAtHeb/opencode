@@ -270,9 +270,7 @@ export function define<
     properties: (input.busSchema ?? input.schema) as BusSchema,
   }
 
-  versions.set(def.type, Math.max(def.version, versions.get(def.type) || 0))
-
-  registry.set(versionedType(def.type, def.version), def)
+  register(def)
 
   return def
 }
@@ -281,7 +279,13 @@ export function project<Def extends Definition>(
   def: Def,
   func: (db: Database.TxOrDb, data: Event<Def>["data"], event: Event<Def>) => void,
 ): [Definition, ProjectorFunc] {
+  register(def)
   return [def, func as ProjectorFunc]
+}
+
+function register(def: Definition) {
+  versions.set(def.type, Math.max(def.version, versions.get(def.type) || 0))
+  registry.set(versionedType(def.type, def.version), def)
 }
 
 function process<Def extends Definition>(

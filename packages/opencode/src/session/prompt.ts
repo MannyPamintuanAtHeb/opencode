@@ -55,6 +55,7 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { EventPublish } from "@/event-publish"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@opencode-ai/core/session-event"
+import { SessionEventSync } from "./session-event-sync"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { AgentAttachment, FileAttachment, ReferenceAttachment, Source } from "@opencode-ai/core/session-prompt"
@@ -961,7 +962,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             }
             yield* sessions.updatePart(part)
             if (flags.experimentalEventSystem) {
-              yield* EventPublish.publish(events, sync, SessionEvent.Shell.Started, {
+              yield* EventPublish.publish(events, sync, SessionEvent.Shell.Started, SessionEventSync.Shell.Started, {
                 sessionID: input.sessionID,
                 timestamp: DateTime.makeUnsafe(started),
                 callID,
@@ -984,7 +985,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               }
               const completed = Date.now()
               if (flags.experimentalEventSystem) {
-                yield* EventPublish.publish(events, sync, SessionEvent.Shell.Ended, {
+                yield* EventPublish.publish(events, sync, SessionEvent.Shell.Ended, SessionEventSync.Shell.Ended, {
                   sessionID: input.sessionID,
                   timestamp: DateTime.makeUnsafe(completed),
                   callID: part.callID,
@@ -1134,7 +1135,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       }
 
       if (current?.agent !== info.agent) {
-        yield* EventPublish.publish(events, sync, SessionEvent.AgentSwitched, {
+        yield* EventPublish.publish(events, sync, SessionEvent.AgentSwitched, SessionEventSync.AgentSwitched, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(info.time.created),
           agent: info.agent,
@@ -1145,7 +1146,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         current.model.id !== info.model.modelID ||
         (current.model.variant === "default" ? undefined : current.model.variant) !== info.model.variant
       ) {
-        yield* EventPublish.publish(events, sync, SessionEvent.ModelSwitched, {
+        yield* EventPublish.publish(events, sync, SessionEvent.ModelSwitched, SessionEventSync.ModelSwitched, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(info.time.created),
           model: {
@@ -1577,7 +1578,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       )
       // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
       if (flags.experimentalEventSystem) {
-        yield* EventPublish.publish(events, sync, SessionEvent.Prompted, {
+        yield* EventPublish.publish(events, sync, SessionEvent.Prompted, SessionEventSync.Prompted, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(info.time.created),
           prompt: {
@@ -1591,7 +1592,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       for (const text of nextPrompt.synthetic) {
         // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
         if (flags.experimentalEventSystem) {
-          yield* EventPublish.publish(events, sync, SessionEvent.Synthetic, {
+          yield* EventPublish.publish(events, sync, SessionEvent.Synthetic, SessionEventSync.Synthetic, {
             sessionID: input.sessionID,
             timestamp: DateTime.makeUnsafe(info.time.created),
             text,

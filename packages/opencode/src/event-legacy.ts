@@ -1,6 +1,5 @@
 import { Bus as ProjectBus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
-import { EventSync } from "@/event-sync"
 import { SyncEvent } from "@/sync"
 import { Event } from "@opencode-ai/core/event"
 import "@opencode-ai/core/catalog"
@@ -23,19 +22,17 @@ export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const events = yield* Event.Service
     const bus = yield* ProjectBus.Service
-    const sync = yield* SyncEvent.Service
 
-    yield* events.subscribeAll().pipe(Stream.runForEach(republish(bus, sync)), Effect.forkScoped)
+    yield* events.subscribeAll().pipe(Stream.runForEach(republish(bus)), Effect.forkScoped)
   }),
 )
 
 export const defaultLayer: Layer.Layer<never> = layer.pipe(
   Layer.provideMerge(Event.defaultLayer),
-  Layer.provideMerge(SyncEvent.defaultLayer),
   Layer.provide(ProjectBus.defaultLayer),
 ) as unknown as Layer.Layer<never>
 
-const republish = (bus: ProjectBus.Interface, sync: SyncEvent.Interface) => (event: Event.Payload) => {
+const republish = (bus: ProjectBus.Interface) => (event: Event.Payload) => {
   const definition = Event.registry.get(event.type)
   if (!definition) return Effect.void
 
@@ -46,7 +43,6 @@ const republish = (bus: ProjectBus.Interface, sync: SyncEvent.Interface) => (eve
 
   return Effect.gen(function* () {
     const existing = syncMetadata(event)
-    if (!existing) yield* sync.run(EventSync.definition(definition), event.data, { publish: false }).pipe(Effect.ignore)
     yield* publishNormal
     yield* Effect.sync(() => {
       GlobalBus.emit("event", {

@@ -1,5 +1,4 @@
 import { SyncEvent } from "@/sync"
-import { EventSync } from "@/event-sync"
 import { EventSequenceTable } from "@/sync/event.sql"
 import { Database, eq } from "@/storage/db"
 import { Event } from "@opencode-ai/core/event"
@@ -9,10 +8,10 @@ export function publish<D extends Event.Definition>(
   events: Event.Interface,
   sync: SyncEvent.Interface,
   definition: D,
+  syncDefinition: SyncEvent.Definition<D["type"], D["schema"]>,
   data: Event.Data<D>,
 ) {
   return Effect.gen(function* () {
-    const syncDefinition = EventSync.definition(definition)
     yield* sync.run(syncDefinition, data as SyncEvent.Event<typeof syncDefinition>["data"], { publish: false })
     const aggregateID = (data as Record<string, string>)[syncDefinition.aggregate]
     const row = aggregateID

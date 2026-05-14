@@ -23,6 +23,7 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { EventPublish } from "@/event-publish"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@opencode-ai/core/session-event"
+import { SessionEventSync } from "./session-event-sync"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -579,7 +580,7 @@ export const layer: Layer.Layer<
           },
         )
         if (flags.experimentalEventSystem) {
-          yield* EventPublish.publish(events, sync, SessionEvent.Compaction.Ended, {
+          yield* EventPublish.publish(events, sync, SessionEvent.Compaction.Ended, SessionEventSync.Compaction.Ended, {
             sessionID: input.sessionID,
             timestamp: DateTime.makeUnsafe(Date.now()),
             text: summary ?? "",
@@ -615,7 +616,7 @@ export const layer: Layer.Layer<
         overflow: input.overflow,
       })
       if (flags.experimentalEventSystem) {
-        yield* EventPublish.publish(events, sync, SessionEvent.Compaction.Started, {
+        yield* EventPublish.publish(events, sync, SessionEvent.Compaction.Started, SessionEventSync.Compaction.Started, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(Date.now()),
           reason: input.auto ? "auto" : "manual",
