@@ -20,10 +20,7 @@ import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2 } from "@opencode-ai/core/event"
-import { EventPublish } from "@/event-publish"
-import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@opencode-ai/core/session-event"
-import { SessionEventSync } from "./session-event-sync"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -235,7 +232,6 @@ export const layer: Layer.Layer<
     const processors = yield* SessionProcessor.Service
     const provider = yield* Provider.Service
     const events = yield* EventV2.Service
-    const sync = yield* SyncEvent.Service
     const flags = yield* RuntimeFlags.Service
 
     const isOverflow = Effect.fn("SessionCompaction.isOverflow")(function* (input: {
@@ -580,7 +576,7 @@ export const layer: Layer.Layer<
           },
         )
         if (flags.experimentalEventSystem) {
-          yield* EventPublish.publish(events, sync, SessionEvent.Compaction.Ended, SessionEventSync.Compaction.Ended, {
+          yield* events.publish(SessionEvent.Compaction.Ended, {
             sessionID: input.sessionID,
             timestamp: DateTime.makeUnsafe(Date.now()),
             text: summary ?? "",
@@ -616,7 +612,7 @@ export const layer: Layer.Layer<
         overflow: input.overflow,
       })
       if (flags.experimentalEventSystem) {
-        yield* EventPublish.publish(events, sync, SessionEvent.Compaction.Started, SessionEventSync.Compaction.Started, {
+        yield* events.publish(SessionEvent.Compaction.Started, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(Date.now()),
           reason: input.auto ? "auto" : "manual",
@@ -631,7 +627,7 @@ export const layer: Layer.Layer<
       create,
     })
   }),
-).pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(SyncEvent.defaultLayer)) as unknown as Layer.Layer<
+).pipe(Layer.provide(EventV2.defaultLayer)) as unknown as Layer.Layer<
   Service,
   never,
   | Bus.Service

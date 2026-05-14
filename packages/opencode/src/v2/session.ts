@@ -9,12 +9,9 @@ import type { Prompt } from "@opencode-ai/core/session-prompt"
 import { EventV2 as LegacyEventV2 } from "./event"
 import { ProjectID } from "@/project/schema"
 import { SessionEvent } from "@opencode-ai/core/session-event"
-import { SessionEventSync } from "@/session/session-event-sync"
 import { V2Schema } from "@opencode-ai/core/v2-schema"
 import { optionalOmitUndefined } from "@opencode-ai/core/schema"
 import { EventV2 } from "@opencode-ai/core/event"
-import { EventPublish } from "@/event-publish"
-import { SyncEvent } from "@/sync"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 
@@ -129,7 +126,6 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2.Service
-    const sync = yield* SyncEvent.Service
     const decodeMessage = Schema.decodeUnknownSync(SessionMessage.Message)
 
     const decode = (row: typeof SessionMessageTable.$inferSelect) =>
@@ -296,14 +292,14 @@ export const layer = Layer.effect(
       shell: Effect.fn("V2Session.shell")(function* (_input) {}),
       skill: Effect.fn("V2Session.skill")(function* (_input) {}),
       switchAgent: Effect.fn("V2Session.switchAgent")(function* (input) {
-        yield* EventPublish.publish(events, sync, SessionEvent.AgentSwitched, SessionEventSync.AgentSwitched, {
+        yield* events.publish(SessionEvent.AgentSwitched, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(Date.now()),
           agent: input.agent,
         })
       }),
       switchModel: Effect.fn("V2Session.switchModel")(function* (input) {
-        yield* EventPublish.publish(events, sync, SessionEvent.ModelSwitched, SessionEventSync.ModelSwitched, {
+        yield* events.publish(SessionEvent.ModelSwitched, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(Date.now()),
           model: input.model,
@@ -336,7 +332,7 @@ export const layer = Layer.effect(
 
     return result
   }),
-).pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(SyncEvent.defaultLayer))
+).pipe(Layer.provide(EventV2.defaultLayer))
 
 export const defaultLayer = layer
 

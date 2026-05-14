@@ -1,5 +1,6 @@
 import { Bus as ProjectBus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
+import { SessionEventSync } from "@/session/session-event-sync"
 import { SyncEvent } from "@/sync"
 import { Event } from "@opencode-ai/core/event"
 import "@opencode-ai/core/catalog"
@@ -22,17 +23,19 @@ export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const events = yield* Event.Service
     const bus = yield* ProjectBus.Service
+    const sync = yield* SyncEvent.Service
 
-    yield* events.subscribeAll().pipe(Stream.runForEach(republish(bus)), Effect.forkScoped)
+    yield* events.subscribeAll().pipe(Stream.runForEach(republish(bus, sync)), Effect.forkScoped)
   }),
 )
 
 export const defaultLayer: Layer.Layer<never> = layer.pipe(
   Layer.provideMerge(Event.defaultLayer),
+  Layer.provideMerge(SyncEvent.defaultLayer),
   Layer.provide(ProjectBus.defaultLayer),
 ) as unknown as Layer.Layer<never>
 
-const republish = (bus: ProjectBus.Interface) => (event: Event.Payload) => {
+const republish = (bus: ProjectBus.Interface, sync: SyncEvent.Interface) => (event: Event.Payload) => {
   const definition = Event.registry.get(event.type)
   if (!definition) return Effect.void
 
@@ -42,37 +45,10 @@ const republish = (bus: ProjectBus.Interface) => (event: Event.Payload) => {
   if (definition.version === undefined) return publishNormal
 
   return Effect.gen(function* () {
-    const existing = syncMetadata(event)
+    const syncDefinition = (SessionEventSync.byType as Map<string, SyncEvent.Definition>).get(definition.type)
+    if (syncDefinition) return yield* sync.run(syncDefinition as SyncEvent.Definition, event.data as SyncEvent.Event["data"], { publish: true })
     yield* publishNormal
-    yield* Effect.sync(() => {
-      GlobalBus.emit("event", {
-        directory: event.instance?.directory,
-        workspace: event.instance?.workspaceID,
-        payload: {
-          type: "sync",
-          name: SyncEvent.versionedType(definition.type, definition.version!),
-          id: event.id,
-          seq: existing?.seq ?? 0,
-          aggregateID: existing?.aggregateID ?? aggregateID(definition, event),
-          data: event.data,
-        },
-      })
-    })
   })
-}
-
-function syncMetadata(event: Event.Payload) {
-  const metadata = event.metadata?.sync
-  if (typeof metadata !== "object" || metadata === null) return
-  if (!("seq" in metadata) || !("aggregateID" in metadata)) return
-  if (typeof metadata.seq !== "number" || typeof metadata.aggregateID !== "string") return
-  return metadata
-}
-
-function aggregateID(definition: Event.Definition, event: Event.Payload) {
-  if (!definition.aggregate) return event.id
-  const value = (event.data as Record<string, unknown>)[definition.aggregate]
-  return typeof value === "string" ? value : event.id
 }
 
 export * as EventLegacy from "./event-legacy"

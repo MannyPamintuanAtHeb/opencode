@@ -49,4 +49,35 @@ export const Compaction = {
   Ended: EventSync.definition(SessionEvent.Compaction.Ended),
 }
 
+export const byType = new Map(
+  [
+    AgentSwitched,
+    ModelSwitched,
+    Prompted,
+    Synthetic,
+    Shell.Started,
+    Shell.Ended,
+    Step.Started,
+    Step.Ended,
+    Step.Failed,
+    Text.Started,
+    Text.Delta,
+    Text.Ended,
+    Tool.Input.Started,
+    Tool.Input.Delta,
+    Tool.Input.Ended,
+    Tool.Called,
+    Tool.Progress,
+    Tool.Success,
+    Tool.Failed,
+    Reasoning.Started,
+    Reasoning.Delta,
+    Reasoning.Ended,
+    Retried,
+    Compaction.Started,
+    Compaction.Delta,
+    Compaction.Ended,
+  ].map((definition) => [definition.type, definition] as const),
+)
+
 export * as SessionEventSync from "./session-event-sync"

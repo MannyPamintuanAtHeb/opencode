@@ -52,10 +52,7 @@ import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2 } from "@opencode-ai/core/event"
-import { EventPublish } from "@/event-publish"
-import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@opencode-ai/core/session-event"
-import { SessionEventSync } from "./session-event-sync"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { AgentAttachment, FileAttachment, ReferenceAttachment, Source } from "@opencode-ai/core/session-prompt"
@@ -206,7 +203,6 @@ export const layer = Layer.effect(
     const llm = yield* LLM.Service
     const references = yield* Reference.Service
     const events = yield* EventV2.Service
-    const sync = yield* SyncEvent.Service
     const flags = yield* RuntimeFlags.Service
     const runner = Effect.fn("SessionPrompt.runner")(function* () {
       return yield* EffectBridge.make()
@@ -962,7 +958,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             }
             yield* sessions.updatePart(part)
             if (flags.experimentalEventSystem) {
-              yield* EventPublish.publish(events, sync, SessionEvent.Shell.Started, SessionEventSync.Shell.Started, {
+              yield* events.publish(SessionEvent.Shell.Started, {
                 sessionID: input.sessionID,
                 timestamp: DateTime.makeUnsafe(started),
                 callID,
@@ -985,7 +981,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               }
               const completed = Date.now()
               if (flags.experimentalEventSystem) {
-                yield* EventPublish.publish(events, sync, SessionEvent.Shell.Ended, SessionEventSync.Shell.Ended, {
+                yield* events.publish(SessionEvent.Shell.Ended, {
                   sessionID: input.sessionID,
                   timestamp: DateTime.makeUnsafe(completed),
                   callID: part.callID,
@@ -1135,7 +1131,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       }
 
       if (current?.agent !== info.agent) {
-        yield* EventPublish.publish(events, sync, SessionEvent.AgentSwitched, SessionEventSync.AgentSwitched, {
+        yield* events.publish(SessionEvent.AgentSwitched, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(info.time.created),
           agent: info.agent,
@@ -1146,7 +1142,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         current.model.id !== info.model.modelID ||
         (current.model.variant === "default" ? undefined : current.model.variant) !== info.model.variant
       ) {
-        yield* EventPublish.publish(events, sync, SessionEvent.ModelSwitched, SessionEventSync.ModelSwitched, {
+        yield* events.publish(SessionEvent.ModelSwitched, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(info.time.created),
           model: {
@@ -1578,7 +1574,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       )
       // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
       if (flags.experimentalEventSystem) {
-        yield* EventPublish.publish(events, sync, SessionEvent.Prompted, SessionEventSync.Prompted, {
+        yield* events.publish(SessionEvent.Prompted, {
           sessionID: input.sessionID,
           timestamp: DateTime.makeUnsafe(info.time.created),
           prompt: {
@@ -1592,7 +1588,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       for (const text of nextPrompt.synthetic) {
         // TODO(v2): Temporary dual-write while migrating session messages to v2 events.
         if (flags.experimentalEventSystem) {
-          yield* EventPublish.publish(events, sync, SessionEvent.Synthetic, SessionEventSync.Synthetic, {
+          yield* events.publish(SessionEvent.Synthetic, {
             sessionID: input.sessionID,
             timestamp: DateTime.makeUnsafe(info.time.created),
             text,
@@ -2001,7 +1997,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       resolvePromptParts,
     })
   }),
-).pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(SyncEvent.defaultLayer))
+).pipe(Layer.provide(EventV2.defaultLayer))
 
 export const defaultLayer = Layer.suspend(() =>
   layer.pipe(
