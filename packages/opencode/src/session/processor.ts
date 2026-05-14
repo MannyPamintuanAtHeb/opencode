@@ -21,7 +21,7 @@ import { Question } from "@/question"
 import { errorMessage } from "@/util/error"
 import * as Log from "@opencode-ai/core/util/log"
 import { isRecord } from "@/util/record"
-import { Event as CoreEvent } from "@opencode-ai/core/event"
+import { EventV2 } from "@opencode-ai/core/event"
 import { EventPublish } from "@/event-publish"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@opencode-ai/core/session-event"
@@ -116,7 +116,7 @@ export const layer: Layer.Layer<
     const scope = yield* Scope.Scope
     const status = yield* SessionStatus.Service
     const image = yield* Image.Service
-    const events = yield* CoreEvent.Service
+    const events = yield* EventV2.Service
     const sync = yield* SyncEvent.Service
     const flags = yield* RuntimeFlags.Service
 
@@ -815,7 +815,7 @@ export const layer: Layer.Layer<
 
     return Service.of({ create })
   }),
-).pipe(Layer.provide(CoreEvent.defaultLayer), Layer.provide(SyncEvent.defaultLayer)) as unknown as Layer.Layer<
+).pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(SyncEvent.defaultLayer)) as unknown as Layer.Layer<
   Service,
   never,
   | Session.Service

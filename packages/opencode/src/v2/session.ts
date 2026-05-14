@@ -6,12 +6,12 @@ import * as Database from "@/storage/db"
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect"
 import { SessionMessage } from "./session-message"
 import type { Prompt } from "@opencode-ai/core/session-prompt"
-import { EventV2 } from "./event"
+import { EventV2 as LegacyEventV2 } from "./event"
 import { ProjectID } from "@/project/schema"
 import { SessionEvent } from "@opencode-ai/core/session-event"
 import { V2Schema } from "@opencode-ai/core/v2-schema"
 import { optionalOmitUndefined } from "@opencode-ai/core/schema"
-import { Event as CoreEvent } from "@opencode-ai/core/event"
+import { EventV2 } from "@opencode-ai/core/event"
 import { EventPublish } from "@/event-publish"
 import { SyncEvent } from "@/sync"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -102,15 +102,15 @@ export interface Interface {
   }) => Effect.Effect<SessionMessage.Message[], never>
   readonly context: (sessionID: SessionID) => Effect.Effect<SessionMessage.Message[], never>
   readonly prompt: (input: {
-    id?: EventV2.ID
+    id?: LegacyEventV2.ID
     sessionID: SessionID
     prompt: Prompt
     delivery?: Delivery
   }) => Effect.Effect<SessionMessage.User, never>
-  readonly shell: (input: { id?: EventV2.ID; sessionID: SessionID; command: string }) => Effect.Effect<void, never>
-  readonly skill: (input: { id?: EventV2.ID; sessionID: SessionID; skill: string }) => Effect.Effect<void, never>
+  readonly shell: (input: { id?: LegacyEventV2.ID; sessionID: SessionID; command: string }) => Effect.Effect<void, never>
+  readonly skill: (input: { id?: LegacyEventV2.ID; sessionID: SessionID; skill: string }) => Effect.Effect<void, never>
   readonly subagent: (input: {
-    id?: EventV2.ID
+    id?: LegacyEventV2.ID
     parentID: SessionID
     prompt: Prompt
     agent: string
@@ -127,7 +127,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/v2
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const events = yield* CoreEvent.Service
+    const events = yield* EventV2.Service
     const sync = yield* SyncEvent.Service
     const decodeMessage = Schema.decodeUnknownSync(SessionMessage.Message)
 
@@ -335,7 +335,7 @@ export const layer = Layer.effect(
 
     return result
   }),
-).pipe(Layer.provide(CoreEvent.defaultLayer), Layer.provide(SyncEvent.defaultLayer))
+).pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(SyncEvent.defaultLayer))
 
 export const defaultLayer = layer
 

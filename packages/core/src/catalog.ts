@@ -6,7 +6,7 @@ import { ModelV2 } from "./model"
 import { PluginV2 } from "./plugin"
 import { ProviderV2 } from "./provider"
 import { Instance } from "./instance"
-import { Event as EventV2 } from "./event"
+import { EventV2 } from "./event"
 
 type ProviderRecord = {
   provider: ProviderV2.Info

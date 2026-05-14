@@ -9,7 +9,7 @@ import type { WorkspaceID } from "@/control-plane/schema"
 import { EventID } from "./schema"
 import { Context, Effect, Layer, Schema as EffectSchema } from "effect"
 import type { DeepMutable } from "@opencode-ai/core/schema"
-import { Event as CoreEvent } from "@opencode-ai/core/event"
+import { EventV2 } from "@opencode-ai/core/event"
 import { serviceUse } from "@/effect/service-use"
 import { InstanceState } from "@/effect/instance-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -370,7 +370,7 @@ export function effectPayloads() {
         }).annotate({ identifier: `SyncEvent.${type}` }),
       )
       .toArray(),
-    ...CoreEvent.registry
+    ...EventV2.registry
       .values()
       .filter(
         (definition) =>

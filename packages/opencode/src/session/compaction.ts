@@ -19,7 +19,7 @@ import { isOverflow as overflow, usable } from "./overflow"
 import { makeRuntime } from "@/effect/run-service"
 import { serviceUse } from "@/effect/service-use"
 import { RuntimeFlags } from "@/effect/runtime-flags"
-import { Event as CoreEvent } from "@opencode-ai/core/event"
+import { EventV2 } from "@opencode-ai/core/event"
 import { EventPublish } from "@/event-publish"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@opencode-ai/core/session-event"
@@ -233,7 +233,7 @@ export const layer: Layer.Layer<
     const plugin = yield* Plugin.Service
     const processors = yield* SessionProcessor.Service
     const provider = yield* Provider.Service
-    const events = yield* CoreEvent.Service
+    const events = yield* EventV2.Service
     const sync = yield* SyncEvent.Service
     const flags = yield* RuntimeFlags.Service
 
@@ -630,7 +630,7 @@ export const layer: Layer.Layer<
       create,
     })
   }),
-).pipe(Layer.provide(CoreEvent.defaultLayer), Layer.provide(SyncEvent.defaultLayer)) as unknown as Layer.Layer<
+).pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(SyncEvent.defaultLayer)) as unknown as Layer.Layer<
   Service,
   never,
   | Bus.Service

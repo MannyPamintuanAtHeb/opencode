@@ -51,7 +51,7 @@ import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
-import { Event as CoreEvent } from "@opencode-ai/core/event"
+import { EventV2 } from "@opencode-ai/core/event"
 import { EventPublish } from "@/event-publish"
 import { SyncEvent } from "@/sync"
 import { SessionEvent } from "@opencode-ai/core/session-event"
@@ -204,7 +204,7 @@ export const layer = Layer.effect(
     const sys = yield* SystemPrompt.Service
     const llm = yield* LLM.Service
     const references = yield* Reference.Service
-    const events = yield* CoreEvent.Service
+    const events = yield* EventV2.Service
     const sync = yield* SyncEvent.Service
     const flags = yield* RuntimeFlags.Service
     const runner = Effect.fn("SessionPrompt.runner")(function* () {
@@ -2000,7 +2000,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       resolvePromptParts,
     })
   }),
-).pipe(Layer.provide(CoreEvent.defaultLayer), Layer.provide(SyncEvent.defaultLayer))
+).pipe(Layer.provide(EventV2.defaultLayer), Layer.provide(SyncEvent.defaultLayer))
 
 export const defaultLayer = Layer.suspend(() =>
   layer.pipe(

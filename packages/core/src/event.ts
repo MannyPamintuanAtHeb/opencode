@@ -153,3 +153,4 @@ export const layer = Layer.effect(
 export const defaultLayer = layer
 
 export * as Event from "./event"
+export * as EventV2 from "./event"
