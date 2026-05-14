@@ -1,3 +1,7 @@
+// Temporary V2 projector adapter: session events now live in core, while
+// opencode's legacy projector API still accepts SyncEvent-shaped definitions.
+// Keep this pure; delete it when projectors operate on core EventV2 definitions
+// directly or when the session.next projector path is removed.
 import { SyncEvent } from "@/sync"
 import { Event } from "@opencode-ai/core/event"
 import { Schema } from "effect"

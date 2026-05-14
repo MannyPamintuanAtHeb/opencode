@@ -1,7 +1,9 @@
+// Temporary V2 bridge: core events are the publish path, but the rest of
+// opencode and the HTTP event stream still expect legacy bus/sync payloads.
+// This layer goes away once consumers subscribe to core EventV2 directly and
+// sync persistence/projectors are no longer used for session.next events.
 import { Bus as ProjectBus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
-import { SessionEventSync } from "@/session/session-event-sync"
-import { SyncEvent } from "@/sync"
 import { Event } from "@opencode-ai/core/event"
 import "@opencode-ai/core/catalog"
 import "@opencode-ai/core/session-event"
@@ -23,19 +25,17 @@ export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const events = yield* Event.Service
     const bus = yield* ProjectBus.Service
-    const sync = yield* SyncEvent.Service
 
-    yield* events.subscribeAll().pipe(Stream.runForEach(republish(bus, sync)), Effect.forkScoped)
+    yield* events.subscribeAll().pipe(Stream.runForEach(republish(bus)), Effect.forkScoped)
   }),
 )
 
 export const defaultLayer: Layer.Layer<never> = layer.pipe(
   Layer.provideMerge(Event.defaultLayer),
-  Layer.provideMerge(SyncEvent.defaultLayer),
   Layer.provide(ProjectBus.defaultLayer),
 ) as unknown as Layer.Layer<never>
 
-const republish = (bus: ProjectBus.Interface, sync: SyncEvent.Interface) => (event: Event.Payload) => {
+const republish = (bus: ProjectBus.Interface) => (event: Event.Payload) => {
   const definition = Event.registry.get(event.type)
   if (!definition) return Effect.void
 
@@ -45,10 +45,28 @@ const republish = (bus: ProjectBus.Interface, sync: SyncEvent.Interface) => (eve
   if (definition.version === undefined) return publishNormal
 
   return Effect.gen(function* () {
-    const syncDefinition = (SessionEventSync.byType as Map<string, SyncEvent.Definition>).get(definition.type)
-    if (syncDefinition) return yield* sync.run(syncDefinition as SyncEvent.Definition, event.data as SyncEvent.Event["data"], { publish: true })
     yield* publishNormal
+    yield* Effect.sync(() => {
+      GlobalBus.emit("event", {
+        directory: event.instance?.directory,
+        workspace: event.instance?.workspaceID,
+        payload: {
+          type: "sync",
+          name: `${definition.type}.${definition.version}`,
+          id: event.id,
+          seq: 0,
+          aggregateID: aggregateID(definition, event),
+          data: event.data,
+        },
+      })
+    })
   })
+}
+
+function aggregateID(definition: Event.Definition, event: Event.Payload) {
+  if (!definition.aggregate) return event.id
+  const value = (event.data as Record<string, unknown>)[definition.aggregate]
+  return typeof value === "string" ? value : event.id
 }
 
 export * as EventLegacy from "./event-legacy"
