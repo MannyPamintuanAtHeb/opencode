@@ -39,6 +39,30 @@ export type Definition<
 export type Payload<D extends Definition = Definition> = Schema.Schema.Type<D>
 export type Data<D extends Definition> = Payload<D>["data"]
 
+export type ProjectorDefinition<
+  Type extends string = string,
+  DataSchema extends Schema.Top = Schema.Top,
+> = {
+  readonly type: Type
+  readonly version: number
+  readonly aggregate: string
+  readonly schema: DataSchema
+  readonly properties: DataSchema
+}
+
+export type ProjectorEvent<D extends Definition> = {
+  readonly id: string
+  readonly seq: number
+  readonly aggregateID: string
+  readonly data: Data<D>
+}
+
+export type ProjectorFunc<D extends Definition, DB> = (db: DB, data: Data<D>, event: ProjectorEvent<D>) => void
+export type ProjectorEntry = [
+  ProjectorDefinition,
+  (db: unknown, data: unknown, event: { readonly id: string; readonly seq: number; readonly aggregateID: string; readonly data: unknown }) => void,
+]
+
 export const registry = new Map<string, Definition>()
 
 export function define<const Type extends string, Fields extends Schema.Struct.Fields>(input: {
@@ -69,6 +93,25 @@ export function define<const Type extends string, Fields extends Schema.Struct.F
 
 export function definitions() {
   return registry.values().toArray()
+}
+
+export function project<DB, D extends Definition>(
+  definition: D,
+  func: ProjectorFunc<D, DB>,
+): ProjectorEntry {
+  if (definition.version === undefined) throw new Error(`Event.project: version required for ${definition.type}`)
+  if (!definition.aggregate) throw new Error(`Event.project: aggregate required for ${definition.type}`)
+
+  return [
+    {
+      type: definition.type,
+      version: definition.version,
+      aggregate: definition.aggregate,
+      schema: definition.schema,
+      properties: definition.schema,
+    },
+    func as ProjectorEntry[1],
+  ]
 }
 
 export interface PublishOptions<D extends Definition> {

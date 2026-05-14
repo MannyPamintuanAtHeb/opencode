@@ -1,15 +1,15 @@
 // Temporary V2 session projector path: builds session message rows from
 // session.next events while storage is still backed by legacy sync projectors.
-// The EventSync.definition(...) calls are local adapters only; remove this file
-// once session.next events are the primary session storage model.
+// EventV2.project(...) returns SyncEvent-shaped projector entries so this file
+// can be mixed into the legacy projector list. Remove this file once
+// session.next events are the primary session storage model.
 import { and, desc, eq } from "@/storage/db"
 import type { Database } from "@/storage/db"
 import { SessionMessage } from "@/v2/session-message"
 import { SessionMessageUpdater } from "@/v2/session-message-updater"
-import { EventSync } from "@/event-sync"
+import { EventV2 } from "@opencode-ai/core/event"
 import { SessionEvent } from "@opencode-ai/core/session-event"
 import * as DateTime from "effect/DateTime"
-import { SyncEvent } from "@/sync"
 import { SessionMessageTable, SessionTable } from "./session.sql"
 import type { SessionID } from "./schema"
 import { Schema } from "effect"
@@ -124,7 +124,7 @@ function update(db: Database.TxOrDb, event: SessionEvent.Event) {
 }
 
 export default [
-  SyncEvent.project(EventSync.definition(SessionEvent.AgentSwitched), (db, data, event) => {
+  EventV2.project(SessionEvent.AgentSwitched, (db: Database.TxOrDb, data, event) => {
     db.update(SessionTable)
       .set({
         agent: data.agent,
@@ -134,7 +134,7 @@ export default [
       .run()
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.agent.switched", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.ModelSwitched), (db, data, event) => {
+  EventV2.project(SessionEvent.ModelSwitched, (db: Database.TxOrDb, data, event) => {
     db.update(SessionTable)
       .set({
         model: data.model,
@@ -144,65 +144,65 @@ export default [
       .run()
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.model.switched", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Prompted), (db, data, event) => {
+  EventV2.project(SessionEvent.Prompted, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.prompted", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Synthetic), (db, data, event) => {
+  EventV2.project(SessionEvent.Synthetic, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.synthetic", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Shell.Started), (db, data, event) => {
+  EventV2.project(SessionEvent.Shell.Started, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.shell.started", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Shell.Ended), (db, data, event) => {
+  EventV2.project(SessionEvent.Shell.Ended, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.shell.ended", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Step.Started), (db, data, event) => {
+  EventV2.project(SessionEvent.Step.Started, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.step.started", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Step.Ended), (db, data, event) => {
+  EventV2.project(SessionEvent.Step.Ended, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.step.ended", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Step.Failed), (db, data, event) => {
+  EventV2.project(SessionEvent.Step.Failed, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.step.failed", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Text.Started), (db, data, event) => {
+  EventV2.project(SessionEvent.Text.Started, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.text.started", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Text.Delta), () => {}),
-  SyncEvent.project(EventSync.definition(SessionEvent.Text.Ended), (db, data, event) => {
+  EventV2.project(SessionEvent.Text.Delta, () => {}),
+  EventV2.project(SessionEvent.Text.Ended, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.text.ended", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Tool.Input.Started), (db, data, event) => {
+  EventV2.project(SessionEvent.Tool.Input.Started, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.input.started", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Tool.Input.Delta), () => {}),
-  SyncEvent.project(EventSync.definition(SessionEvent.Tool.Input.Ended), (db, data, event) => {
+  EventV2.project(SessionEvent.Tool.Input.Delta, () => {}),
+  EventV2.project(SessionEvent.Tool.Input.Ended, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.input.ended", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Tool.Called), (db, data, event) => {
+  EventV2.project(SessionEvent.Tool.Called, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.called", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Tool.Success), (db, data, event) => {
+  EventV2.project(SessionEvent.Tool.Success, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.success", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Tool.Failed), (db, data, event) => {
+  EventV2.project(SessionEvent.Tool.Failed, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.tool.failed", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Reasoning.Started), (db, data, event) => {
+  EventV2.project(SessionEvent.Reasoning.Started, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.reasoning.started", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Reasoning.Delta), () => {}),
-  SyncEvent.project(EventSync.definition(SessionEvent.Reasoning.Ended), (db, data, event) => {
+  EventV2.project(SessionEvent.Reasoning.Delta, () => {}),
+  EventV2.project(SessionEvent.Reasoning.Ended, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.reasoning.ended", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Retried), (db, data, event) => {
+  EventV2.project(SessionEvent.Retried, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.retried", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Compaction.Started), (db, data, event) => {
+  EventV2.project(SessionEvent.Compaction.Started, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.compaction.started", data })
   }),
-  SyncEvent.project(EventSync.definition(SessionEvent.Compaction.Delta), () => {}),
-  SyncEvent.project(EventSync.definition(SessionEvent.Compaction.Ended), (db, data, event) => {
+  EventV2.project(SessionEvent.Compaction.Delta, () => {}),
+  EventV2.project(SessionEvent.Compaction.Ended, (db: Database.TxOrDb, data, event) => {
     update(db, { id: SessionMessage.ID.make(event.id), type: "session.next.compaction.ended", data })
   }),
 ]

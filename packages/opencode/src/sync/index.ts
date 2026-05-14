@@ -226,6 +226,9 @@ export function reset() {
 }
 
 export function init(input: { projectors: Array<[Definition, ProjectorFunc]>; convertEvent?: ConvertEvent }) {
+  for (const [def] of input.projectors) {
+    register(def)
+  }
   projectors = new Map(input.projectors)
 
   // Install all the latest event defs to the bus. We only ever emit
