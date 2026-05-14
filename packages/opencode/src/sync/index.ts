@@ -33,22 +33,16 @@ export type Definition<
   properties: BusSchema
 }
 
-type CoreDefinition = CoreEvent.Definition
-
-type AnyDefinition = Definition | CoreDefinition
-
-export type Event<Def extends AnyDefinition = AnyDefinition> = {
+export type Event<Def extends Definition = Definition> = {
   id: string
   seq: number
   aggregateID: string
   data: DeepMutable<EffectSchema.Schema.Type<Def["schema"]>>
 }
 
-export type Properties<Def extends AnyDefinition = AnyDefinition> = Def extends Definition
-  ? EffectSchema.Schema.Type<Def["properties"]>
-  : EffectSchema.Schema.Type<Def["schema"]>
+export type Properties<Def extends Definition = Definition> = EffectSchema.Schema.Type<Def["properties"]>
 
-export type SerializedEvent<Def extends AnyDefinition = AnyDefinition> = Event<Def> & { type: string }
+export type SerializedEvent<Def extends Definition = Definition> = Event<Def> & { type: string }
 
 type ProjectorFunc = (db: Database.TxOrDb, data: unknown, event: Event) => void
 type ConvertEvent = (type: string, data: Event["data"]) => unknown | Promise<unknown>
@@ -58,11 +52,11 @@ type PublishContext = {
 }
 
 export interface Interface {
-  readonly run: <Def extends AnyDefinition>(
+  readonly run: <Def extends Definition>(
     def: Def,
     data: Event<Def>["data"],
-    options?: { id?: string; publish?: boolean },
-  ) => Effect.Effect<Event<Def>>
+    options?: { publish?: boolean },
+  ) => Effect.Effect<void>
   readonly replay: (event: SerializedEvent, options?: { publish: boolean; ownerID?: string }) => Effect.Effect<void>
   readonly replayAll: (
     events: SerializedEvent[],
@@ -79,7 +73,7 @@ export const layer = Layer.effect(Service)(
     const flags = yield* RuntimeFlags.Service
 
     const replay: Interface["replay"] = Effect.fn("SyncEvent.replay")(function* (event, options) {
-      const def = definition(event.type)
+      const def = registry.get(event.type)
       if (!def) {
         throw new Error(`Unknown event type: ${event.type}`)
       }
@@ -141,14 +135,14 @@ export const layer = Layer.effect(Service)(
     })
 
     const run: Interface["run"] = Effect.fn("SyncEvent.run")(function* (def, data, options) {
-      const agg = (data as Record<string, string>)[requireAggregate(def)]
+      const agg = (data as Record<string, string>)[def.aggregate]
       // This should never happen: we've enforced it via typescript in
       // the definition
       if (agg == null) {
-        throw new Error(`SyncEvent.run: "${requireAggregate(def)}" required but not found: ${JSON.stringify(data)}`)
+        throw new Error(`SyncEvent.run: "${def.aggregate}" required but not found: ${JSON.stringify(data)}`)
       }
 
-      if ("properties" in def && def.version !== versions.get(def.type)) {
+      if (def.version !== versions.get(def.type)) {
         throw new Error(`SyncEvent.run: running old versions of events is not allowed: ${def.type}`)
       }
 
@@ -163,9 +157,9 @@ export const layer = Layer.effect(Service)(
       // Note that this is an "immediate" transaction which is critical.
       // We need to make sure we can safely read and write with nothing
       // else changing the data from under us
-      return Database.transaction(
+      Database.transaction(
         (tx) => {
-          const id = options?.id ?? EventID.ascending()
+          const id = EventID.ascending()
           const row = tx
             .select({ seq: EventSequenceTable.seq })
             .from(EventSequenceTable)
@@ -175,7 +169,6 @@ export const layer = Layer.effect(Service)(
 
           const event = { id, seq, aggregateID: agg, data }
           process(def, event, { publish, context, experimentalWorkspaces: flags.experimentalWorkspaces })
-          return event
         },
         {
           behavior: "immediate",
@@ -212,12 +205,12 @@ export const layer = Layer.effect(Service)(
   }),
 )
 
-export const defaultLayer: Layer.Layer<Service> = layer.pipe(Layer.provide(RuntimeFlags.defaultLayer))
+export const defaultLayer = layer.pipe(Layer.provide(RuntimeFlags.defaultLayer))
 
 export const use = serviceUse(Service)
 
 export const registry = new Map<string, Definition>()
-let projectors: Map<AnyDefinition, ProjectorFunc> | undefined
+let projectors: Map<Definition, ProjectorFunc> | undefined
 const versions = new Map<string, number>()
 let frozen = false
 let convertEvent: ConvertEvent
@@ -228,7 +221,7 @@ export function reset() {
   convertEvent = (_, data) => data
 }
 
-export function init(input: { projectors: Array<[AnyDefinition, ProjectorFunc]>; convertEvent?: ConvertEvent }) {
+export function init(input: { projectors: Array<[Definition, ProjectorFunc]>; convertEvent?: ConvertEvent }) {
   projectors = new Map(input.projectors)
 
   // Install all the latest event defs to the bus. We only ever emit
@@ -284,14 +277,14 @@ export function define<
   return def
 }
 
-export function project<Def extends AnyDefinition>(
+export function project<Def extends Definition>(
   def: Def,
   func: (db: Database.TxOrDb, data: Event<Def>["data"], event: Event<Def>) => void,
-): [AnyDefinition, ProjectorFunc] {
+): [Definition, ProjectorFunc] {
   return [def, func as ProjectorFunc]
 }
 
-function process<Def extends AnyDefinition>(
+function process<Def extends Definition>(
   def: Def,
   event: Event<Def>,
   options: { publish: boolean; context?: PublishContext; ownerID?: string; experimentalWorkspaces: boolean },
@@ -325,7 +318,7 @@ function process<Def extends AnyDefinition>(
           id: event.id,
           seq: event.seq,
           aggregate_id: event.aggregateID,
-          type: versionedType(def.type, requireVersion(def)),
+          type: versionedType(def.type, def.version),
           data: event.data as Record<string, unknown>,
         })
         .run()
@@ -338,10 +331,12 @@ function process<Def extends AnyDefinition>(
         }
 
         const result = convertEvent(def.type, event.data)
-        const publish = (data: unknown) =>
-          ProjectBus.publish({ type: def.type, properties: properties(def) }, data as Properties<Def>, { id: event.id })
-        if (result instanceof Promise) void result.then(publish)
-        else void publish(result)
+        const publish = (data: unknown) => ProjectBus.publish(def, data as Properties<Def>, { id: event.id })
+        if (result instanceof Promise) {
+          void result.then(publish)
+        } else {
+          void publish(result)
+        }
 
         GlobalBus.emit("event", {
           directory: options.context.instance.directory,
@@ -350,7 +345,7 @@ function process<Def extends AnyDefinition>(
           payload: {
             type: "sync",
             syncEvent: {
-              type: versionedType(def.type, requireVersion(def)),
+              type: versionedType(def.type, def.version),
               ...event,
             },
           },
@@ -358,27 +353,6 @@ function process<Def extends AnyDefinition>(
       }
     })
   })
-}
-
-function definition(type: string): AnyDefinition | undefined {
-  return (
-    registry.get(type) ??
-    CoreEvent.definitions().find((item) => item.version !== undefined && versionedType(item.type, item.version) === type)
-  )
-}
-
-function properties<Def extends AnyDefinition>(def: Def) {
-  return ("properties" in def ? def.properties : def.schema) as Def extends Definition ? Def["properties"] : Def["schema"]
-}
-
-function requireVersion(def: AnyDefinition) {
-  if (def.version === undefined) throw new Error(`SyncEvent: version required for ${def.type}`)
-  return def.version
-}
-
-function requireAggregate(def: AnyDefinition) {
-  if (!def.aggregate) throw new Error(`SyncEvent: aggregate required for ${def.type}`)
-  return def.aggregate
 }
 
 export function effectPayloads() {

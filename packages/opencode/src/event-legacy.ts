@@ -1,5 +1,6 @@
 import { Bus as ProjectBus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
+import { EventSync } from "@/event-sync"
 import { SyncEvent } from "@/sync"
 import { Event } from "@opencode-ai/core/event"
 import "@opencode-ai/core/catalog"
@@ -45,12 +46,9 @@ const republish = (bus: ProjectBus.Interface, sync: SyncEvent.Interface) => (eve
 
   return Effect.gen(function* () {
     const existing = syncMetadata(event)
-    const persisted = existing
-      ? undefined
-      : yield* sync.run(definition, event.data, { id: event.id, publish: false }).pipe(Effect.option)
+    if (!existing) yield* sync.run(EventSync.definition(definition), event.data, { publish: false }).pipe(Effect.ignore)
     yield* publishNormal
     yield* Effect.sync(() => {
-      const syncEvent = existing ?? (persisted?._tag === "Some" ? persisted.value : undefined)
       GlobalBus.emit("event", {
         directory: event.instance?.directory,
         workspace: event.instance?.workspaceID,
@@ -58,8 +56,8 @@ const republish = (bus: ProjectBus.Interface, sync: SyncEvent.Interface) => (eve
           type: "sync",
           name: SyncEvent.versionedType(definition.type, definition.version!),
           id: event.id,
-          seq: syncEvent?.seq ?? 0,
-          aggregateID: syncEvent?.aggregateID ?? aggregateID(definition, event),
+          seq: existing?.seq ?? 0,
+          aggregateID: existing?.aggregateID ?? aggregateID(definition, event),
           data: event.data,
         },
       })
